@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Voxel AI Test - v1.0</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+            background: linear-gradient(to bottom, #87CEEB, #98D8E8);
+        }
+        
+        #gameCanvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        /* HUD */
+        .hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 14px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            pointer-events: none;
+            z-index: 100;
+        }
+        
+        .hud-item {
+            background: rgba(0,0,0,0.3);
+            padding: 8px 12px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            backdrop-filter: blur(10px);
+        }
+        
+        /* Mobile Controls */
+        .mobile-controls {
+            position: fixed;
+            bottom: 20px;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 1000;
+            pointer-events: none;
+        }
+        
+        .joystick-container {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            pointer-events: auto;
+        }
+        
+        .joystick-base {
+            position: absolute;
+            width: 120px;
+            height: 120px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 3px solid rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            backdrop-filter: blur(10px);
+        }
+        
+        .joystick-stick {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.6);
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            transition: none;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+            pointer-events: auto;
+        }
+        
+        .action-btn {
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.3);
+            border: 3px solid rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+            backdrop-filter: blur(10px);
+            cursor: pointer;
+            transition: transform 0.1s;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        
+        .action-btn:active {
+            transform: scale(0.9);
+            background: rgba(255, 255, 255, 0.5);
+        }
+        
+        .jump-btn {
+            width: 70px;
+            height: 70px;
+            font-size: 28px;
+        }
+        
+        /* Loading Screen */
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            transition: opacity 0.5s;
+        }
+        
+        .loading-text {
+            color: white;
+            font-size: 24px;
+            margin-top: 20px;
+            font-weight: 300;
+        }
+        
+        .loading-bar {
+            width: 200px;
+            height: 4px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+            margin-top: 20px;
+            overflow: hidden;
+        }
+        
+        .loading-progress {
+            height: 100%;
+            background: white;
+            border-radius: 2px;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        /* Desktop hide controls */
+        @media (min-width: 768px) and (pointer: fine) {
+            .mobile-controls {
+                display: none;
+            }
+        }
+        
+        /* Crosshair */
+        .crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            pointer-events: none;
+            z-index: 100;
+        }
+        
+        .crosshair::before,
+        .crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(255, 255, 255, 0.8);
+            box-shadow: 0 0 3px rgba(0,0,0,0.5);
+        }
+        
+        .crosshair::before {
+            width: 2px;
+            height: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        
+        .crosshair::after {
+            width: 20px;
+            height: 2px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div class="loading" id="loadingScreen">
+        <div class="loading-text">Cargando mundo...</div>
+        <div class="loading-bar">
+            <div class="loading-progress" id="loadingProgress"></div>
+        </div>
+    </div>
+    
+    <!-- Game Canvas -->
+    <canvas id="gameCanvas"></canvas>
+    
+    <!-- HUD -->
+    <div class="hud">
+        <div class="hud-item">
+            <strong>Voxel AI Test</strong> v1.0
+        </div>
+        <div class="hud-item" id="fpsCounter">
+            FPS: 60
+        </div>
+        <div class="hud-item" id="position">
+            Posición: X:0 Y:5 Z:0
+        </div>
+    </div>
+    
+    <!-- Crosshair -->
+    <div class="crosshair"></div>
+    
+    <!-- Mobile Controls -->
+    <div class="mobile-controls" id="mobileControls">
+        <!-- Movement Joystick -->
+        <div class="joystick-container" id="joystick">
+            <div class="joystick-base"></div>
+            <div class="joystick-stick" id="joystickStick"></div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+            <button class="action-btn" id="placeBtn">🔨</button>
+            <button class="action-btn jump-btn" id="jumpBtn">⬆</button>
+            <button class="action-btn" id="breakBtn">⛏</button>
+        </div>
+    </div>
+    
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- Game Script -->
+    <script src="game.js"></script>
+</body>
+</html>
